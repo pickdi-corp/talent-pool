@@ -17,6 +17,10 @@
   function num(s) { var n = parseFloat(s); return isNaN(n) ? null : n; }
   function safeUrl(u) { u = String(u || '').trim(); return /^https?:\/\//i.test(u) ? u : ''; }
   function isNow(p) { return /즉시/.test(p.availability_label || ''); }
+  // Google Analytics (GA4): events only carry Member ID and UI values, never names or contacts
+  function track(name, params) { try { if (window.gtag) window.gtag('event', name, params || {}); } catch (err) {} }
+  function profileParams(id) { var p = state.all.filter(function (x) { return x.member_id === id; })[0] || {}; return { member_id: id, tier: p.tier || '', job_title: p.job_title || '' }; }
+  var searchTimer = null;
   function slug(id) { return String(id || '').toLowerCase().replace(/_/g, '-'); }
   function idFromSlug(s) { s = String(s || '').replace(/^#/, ''); return s.toUpperCase().replace(/^MEM-/, 'MEM_'); }
 
@@ -192,7 +196,7 @@
     if (items.length) out += '<ul>' + items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
     return out;
   }
-  function file(url, label, sub) { url = safeUrl(url); return url ? '<a class="pt-file" href="' + esc(url) + '" target="_blank" rel="noopener"><span><b>' + esc(label) + '</b>' + (sub ? '<br><small>' + esc(sub) + '</small>' : '') + '</span><span aria-hidden="true">↗</span></a>' : ''; }
+  function file(url, label, sub, ga) { url = safeUrl(url); return url ? '<a class="pt-file" data-ga="' + esc(ga || 'file') + '" href="' + esc(url) + '" target="_blank" rel="noopener"><span><b>' + esc(label) + '</b>' + (sub ? '<br><small>' + esc(sub) + '</small>' : '') + '</span><span aria-hidden="true">↗</span></a>' : ''; }
 
   function detailHtml(id) {
     var p = state.all.filter(function (x) { return x.member_id === id; })[0];
@@ -208,12 +212,12 @@
       ['업무 가능 언어', langs(p.work_languages) || '확인 중'], ['회화 가능 언어', langs(p.speaking_languages) || '확인 중'],
       ['툴', p.tools], ['채널 경험', p.channels], ['산업 경험', p.client_industries]
     ].filter(function (x) { return x[1]; }).map(function (x) { return '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + (x[2] ? ' <small class="pt-kv-sub">' + esc(x[2]) + '</small>' : '') + '</dd></div>'; }).join('');
-    var files = file(p.cv_url, '이력서 보기', '개인 연락처는 가려져 있습니다') +
-      file(p.portfolio_url, '포트폴리오') +
-      String(p.extra_portfolio || '').split(/[\s,]+/).map(function (u, i) { return file(u, '추가 포트폴리오' + (i ? ' ' + (i + 1) : '')); }).join('') +
+    var files = file(p.cv_url, '이력서 보기', '개인 연락처는 가려져 있습니다', 'cv') +
+      file(p.portfolio_url, '포트폴리오', '', 'portfolio') +
+      String(p.extra_portfolio || '').split(/[\s,]+/).map(function (u, i) { return file(u, '추가 포트폴리오' + (i ? ' ' + (i + 1) : ''), '', 'extra_portfolio'); }).join('') +
       '';
-    var hireFiles = file(p.assignment_url, p.assignment_title || '채용 과제', '픽디 채용 과정 과제') +
-      file(p.interview_url, p.interview_title || '면접 기록', '픽디 채용 과정 면접');
+    var hireFiles = file(p.assignment_url, p.assignment_title || '채용 과제', '픽디 채용 과정 과제', 'assignment') +
+      file(p.interview_url, p.interview_title || '면접 기록', '픽디 채용 과정 면접', 'interview');
 
     return '<div class="pt-scrim" data-close="1"></div>' +
       '<aside class="pt-sheet" role="dialog" aria-modal="true" aria-labelledby="pt-d-title">' +
@@ -223,8 +227,8 @@
             list(p.field_tags).map(function (t) { return '<span class="pt-tag pt-tag-strong">' + esc(t) + '</span>'; }).join('') +
           '</div>' + availBadge(p) + '</div><div class="pt-row-head"><h2 id="pt-d-title">' + esc(p.job_title) + '</h2>' + tierBadge(p) + tierInfo(p) + '</div>' +
           '<div class="pt-d-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</div>' +
-          '<div class="pt-cta"><a class="pt-btn pt-btn-primary" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
-            (safeUrl(p.cv_url) ? '<a class="pt-btn" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
+          '<div class="pt-cta"><a class="pt-btn pt-btn-primary" data-ga="match_request" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
+            (safeUrl(p.cv_url) ? '<a class="pt-btn" data-ga="cv" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
           '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 일정은 매칭 신청 후 다시 확인해드립니다.</p>' +
           (isBusy ? '<p class="pt-note" style="margin-top:6px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
           '</div>' +
@@ -245,13 +249,21 @@
   /* ---------- events ---------- */
   root.addEventListener('click', function (e) {
     var tip = e.target.closest('[data-tip]');
-    if (tip) { var w = tip.parentNode; var on = !w.classList.contains('pt-tip-open'); w.classList.toggle('pt-tip-open', on); tip.setAttribute('aria-expanded', on); return; }
+    if (tip) { var w = tip.parentNode; var on = !w.classList.contains('pt-tip-open'); w.classList.toggle('pt-tip-open', on); tip.setAttribute('aria-expanded', on); if (on) track('tier_price_open', profileParams(state.open)); return; }
+    var ga = e.target.closest('a[data-ga]');
+    if (ga) {
+      var params = profileParams(state.open);
+      if (ga.dataset.ga === 'match_request') track('match_request_click', params);
+      else { params.file_type = ga.dataset.ga; track('file_open', params); }
+      return;
+    }
     var t = e.target.closest('[data-k],[data-open],[data-close]');
     if (!t) return;
     if (t.dataset.open) return openDetail(t.dataset.open);
     if (t.dataset.close) return openDetail(null);
     var k = t.dataset.k, v = t.dataset.v;
     var d = root.querySelector('#pt-fdetails'); state.mobileOpen = d ? d.open : false;
+    track('filter_use', { filter_type: k, filter_value: v || '' });
     if (k === 'reset') { state.q = ''; state.field.clear(); state.tier.clear(); state.channel.clear(); state.now = false; }
     else if (k === 'now') state.now = !state.now;
     else { var set = state[k]; set.has(v) ? set.delete(v) : set.add(v); }
@@ -260,17 +272,20 @@
   root.addEventListener('input', function (e) {
     if (e.target.id !== 'pt-q') return;
     state.q = e.target.value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { if (state.q.trim()) track('search', { search_term: state.q.trim() }); }, 1200);
     var pos = e.target.selectionStart;
     render();
     var q = root.querySelector('#pt-q'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (err) {} }
   });
   root.addEventListener('change', function (e) {
-    if (e.target.id === 'pt-sort') { state.sort = e.target.value; render(); }
+    if (e.target.id === 'pt-sort') { state.sort = e.target.value; track('sort_change', { sort_by: state.sort }); render(); }
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && state.open) openDetail(null); });
 
   function openDetail(id) {
     state.open = id;
+    if (id) track('view_profile', Object.assign(profileParams(id), { source: 'list' }));
     try { history.replaceState(null, '', id ? '#' + slug(id) : location.pathname + location.search); } catch (err) {}
     document.documentElement.style.overflow = id ? 'hidden' : '';
     render();
@@ -286,7 +301,8 @@
     state.all = (json && json.profiles) || [];
     var fromQuery = (location.search.match(/[?&]id=([^&]+)/) || [])[1];
     var id = fromQuery ? decodeURIComponent(fromQuery).toUpperCase() : (location.hash ? idFromSlug(location.hash) : null);
-    if (id && state.all.some(function (p) { return p.member_id === id; })) state.open = id;
+    if (id && state.all.some(function (p) { return p.member_id === id; })) { state.open = id; track('view_profile', Object.assign(profileParams(id), { source: 'direct_link' })); }
+    track('talent_list_loaded', { profile_count: state.all.length });
     render();
   }).catch(function () {
     root.innerHTML = '<div class="pt-wrap"><div class="pt-empty">인재 목록을 불러오지 못했습니다. 잠시 후 새로고침해 주세요. 계속 안 되면 픽디 담당 매니저에게 알려주세요.</div></div>';
