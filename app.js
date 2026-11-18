@@ -8,6 +8,8 @@
 
   var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'avail', open: null };
   var TIER_ORDER = { '신입': 1, '스탠다드': 2, '프로': 3 };
+  // 티어별 월 서비스 이용료 (부가세 별도, 월 21일·168시간 기준)
+  var TIER_PRICE = [['신입', '99만원'], ['스탠다드', '139만원'], ['프로', '189만원']];
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function list(s) { return String(s || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
@@ -88,7 +90,7 @@
       '<div class="pt-wrap">' +
         '<header class="pt-head"><div><p class="pt-eyebrow">PICKDI TALENT POOL</p>' +
           '<h1 class="pt-title">픽디 탤런트 풀</h1>' +
-          '<p class="pt-lead">즉시 매칭 가능한 인력 풀을 소개합니다. 픽디를 통해 한국 고객사와 실제로 일해 본 마케터, 디자이너, 영상 편집자, 이커머스 운영 등의 다양한 포지션이 있습니다. 픽디의 평가, 고객사 협업 이력, 이력서와 포트폴리오를 함께 확인해보세요.</p></div>' +
+          '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, 매칭을 신청해 보세요.</p></div>' +
           '<div class="pt-facts"><div class="pt-fact"><b>' + state.all.length + '</b><span>등록 인재</span></div>' +
           '<div class="pt-fact"><b>' + nowCount + '</b><span>즉시 가능</span></div></div></header>' +
         '<div class="pt-grid">' +
@@ -149,6 +151,16 @@
     '</button>';
   }
 
+  function tierInfo(p) {
+    if (!p.tier) return '';
+    var rows = TIER_PRICE.map(function (t) {
+      return '<li' + (t[0] === p.tier ? ' class="pt-on"' : '') + '><span>' + esc(t[0]) + '</span><b>월 ' + esc(t[1]) + '</b></li>';
+    }).join('');
+    return '<span class="pt-tip"><button type="button" class="pt-tip-btn" aria-label="등급별 서비스 이용료 보기" aria-expanded="false" data-tip="1">i</button>' +
+      '<span class="pt-tip-pop" role="tooltip"><strong>등급별 월 서비스 이용료</strong><ul>' + rows + '</ul>' +
+      '<small>부가세 별도 · 월 21일(168시간) 기준 · 실제 근무 시간만큼 청구</small></span></span>';
+  }
+
   function sec(title, body, cls) { return body ? '<section class="pt-sec' + (cls ? ' ' + cls : '') + '"><h3>' + esc(title) + '</h3>' + body + '</section>' : ''; }
   function ul(s) { var l = lines(s); return l.length ? '<ul>' + l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; }
   function para(s) { return s ? '<p>' + esc(s) + '</p>' : ''; }
@@ -180,28 +192,30 @@
         '<div class="pt-sheet-body">' +
           '<div class="pt-d-head"><div class="pt-row-top"><div class="pt-meta">' +
             list(p.field_tags).map(function (t) { return '<span class="pt-tag pt-tag-strong">' + esc(t) + '</span>'; }).join('') +
-          '</div>' + availBadge(p) + '</div><div class="pt-row-head"><h2 id="pt-d-title">' + esc(p.job_title) + '</h2>' + tierBadge(p) + '</div>' +
+          '</div>' + availBadge(p) + '</div><div class="pt-row-head"><h2 id="pt-d-title">' + esc(p.job_title) + '</h2>' + tierBadge(p) + tierInfo(p) + '</div>' +
           '<div class="pt-d-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</div>' +
           '<div class="pt-cta"><a class="pt-btn pt-btn-primary" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
             (safeUrl(p.cv_url) ? '<a class="pt-btn" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
           (isBusy ? '<p class="pt-note" style="margin-top:10px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
           '</div>' +
           '<dl class="pt-kv">' + kv + '</dl>' +
-          sec('픽디 매니저 코멘트', para(p.pickdi_comment), 'pt-quote') +
+          sec('픽디 코멘트', para(p.pickdi_comment), 'pt-quote') +
           sec('주요 경력', ul(careerLines(p).join('\n'))) +
           sec('주요 업무', ul(p.past_tasks)) +
           sec('주요 성과', ul(p.key_achievements)) +
-          sec('언어 참고', para(p.language_notes)) +
-          sec('자기소개', para(p.self_intro)) +
-          sec('채용 평가 요약', para(p.hiring_eval_summary)) +
-          sec('이력서·포트폴리오', files ? '<div class="pt-files">' + files + '</div>' : '') +
           sec('이전 계약 종료 사유', para(p.end_reason)) +
+          sec('언어 참고', para(p.language_notes)) +
+          sec('채용 평가 요약', para(p.hiring_eval_summary)) +
+          sec('자기소개', para(p.self_intro) + '<p class="pt-note">본인이 직접 작성한 소개를 정리했습니다.</p>', 'pt-card') +
+          sec('이력서·포트폴리오', files ? '<div class="pt-files">' + files + '</div>' : '', 'pt-card') +
           '<p class="pt-note">최근 업데이트 ' + esc(p.last_updated) + ' · 고객사명은 일부 가려서 표시합니다.</p>' +
         '</div></aside>';
   }
 
   /* ---------- events ---------- */
   root.addEventListener('click', function (e) {
+    var tip = e.target.closest('[data-tip]');
+    if (tip) { var w = tip.parentNode; var on = !w.classList.contains('pt-tip-open'); w.classList.toggle('pt-tip-open', on); tip.setAttribute('aria-expanded', on); return; }
     var t = e.target.closest('[data-k],[data-open],[data-close]');
     if (!t) return;
     if (t.dataset.open) return openDetail(t.dataset.open);
