@@ -6,7 +6,8 @@
   var root = document.getElementById('pt-root');
   if (!root) return;
 
-  var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'avail', open: null };
+  var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'avail', open: null,
+                ids: null, pick: false, picked: new Set() };   // ids: shortlist from ?ids=, pick: staff selection mode (?pick=1)
   var TIER_ORDER = { '신입': 1, '스탠다드': 2, '프로': 3 };
   // 티어별 월 서비스 이용료 (부가세 별도, 월 21일·168시간 기준)
   var TIER_PRICE = [['신입', '99만원'], ['스탠다드', '139만원'], ['프로', '189만원']];
@@ -47,6 +48,7 @@
   function filtered() {
     var q = state.q.trim().toLowerCase();
     var res = state.all.filter(function (p) {
+      if (state.ids && state.ids.indexOf(p.member_id) < 0) return false;
       if (state.field.size && !list(p.field_tags).some(function (f) { return state.field.has(f); })) return false;
       if (state.tier.size && !state.tier.has(p.tier)) return false;
       if (state.channel.size && !list(p.channels).some(function (c) { return state.channel.has(c); })) return false;
@@ -87,12 +89,15 @@
       chipGroup('채널 경험', 'channel', counts('channels', list), state.channel) +
       (anyFilter ? '<button type="button" class="pt-reset" data-k="reset">필터 초기화</button>' : '');
 
-    var rows = res.length ? res.map(rowHtml).join('') :
+    var rows = res.length ? res.map(function (p) { return state.pick ? pickWrap(p) : rowHtml(p); }).join('') :
       (state.all.length ? '<div class="pt-empty">조건에 맞는 인재가 없습니다. 필터를 줄여 보세요.</div>' : '<div class="pt-empty">현재 소개 가능한 인재를 준비하고 있습니다. 곧 업데이트됩니다.</div>');
 
     var lastUpdate = state.updated || state.all.map(function (x) { return String(x.last_updated || ''); }).sort().pop() || '';
     root.innerHTML =
       '<div class="pt-wrap">' +
+        (state.ids ? '<div class="pt-shortlist"><div><b>픽디가 추천드리는 인재 ' + res.length + '명</b>' +
+          '<span>요청하신 조건에 맞춰 골랐습니다. 마음에 드는 인재의 상세 화면에서 매칭을 신청해 주세요.</span></div>' +
+          '<a href="' + esc(location.pathname) + '" data-all="1">전체 인재 보기</a></div>' : '') +
         '<header class="pt-head"><div><p class="pt-eyebrow">PICKDI TALENT POOL</p>' +
           '<h1 class="pt-title">픽디 탤런트 풀</h1>' +
           '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, 매칭을 신청해 보세요.</p>' +
@@ -106,8 +111,73 @@
               opt('avail', '업무 가능일 빠른 순') + opt('exp', '경력 많은 순') + opt('pickdi', '픽디 경력 많은 순') + opt('tier', '등급 높은 순') +
             '</select></label></div><div class="pt-list">' + rows + '</div></section>' +
         '</div>' +
-      '</div>' + (state.open ? detailHtml(state.open) : '');
+      '</div>' + (state.pick ? pickBar() : '') + (state.open ? detailHtml(state.open) : '') +
+      '<div class="pt-toast" role="status" aria-live="polite"></div>';
+    syncUrl();
+  }
 
+  /* ---------- URL: filters, shortlist, pick mode (no buttons; the address bar is the share link) ---------- */
+  var SEP = '~';
+  function syncUrl() {
+    var q = [];
+    if (state.ids) q.push('ids=' + state.ids.join(','));
+    if (state.pick) q.push('pick=1');
+    [['field', state.field], ['tier', state.tier], ['channel', state.channel]].forEach(function (x) {
+      if (x[1].size) q.push(x[0] + '=' + encodeURIComponent(Array.from(x[1]).join(SEP)));
+    });
+    if (state.now) q.push('now=1');
+    if (state.q.trim()) q.push('q=' + encodeURIComponent(state.q.trim()));
+    if (state.sort !== 'avail') q.push('sort=' + state.sort);
+    var url = location.pathname + (q.length ? '?' + q.join('&') : '') + (state.open ? '#' + slug(state.open) : '');
+    if (url !== location.pathname + location.search + location.hash) { try { history.replaceState(null, '', url); } catch (err) {} }
+  }
+  function readUrl() {
+    var p = {};
+    location.search.replace(/^\?/, '').split('&').forEach(function (kv) { if (!kv) return; var i = kv.indexOf('='); p[kv.slice(0, i < 0 ? kv.length : i)] = i < 0 ? '' : decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); });
+    if (p.ids) state.ids = p.ids.toUpperCase().split(/[,\s]+/).filter(function (x) { return /^MEM_/.test(x); });
+    if (state.ids && !state.ids.length) state.ids = null;
+    state.pick = p.pick === '1';
+    ['field', 'tier', 'channel'].forEach(function (k) { if (p[k]) p[k].split(SEP).forEach(function (v) { if (v) state[k].add(v); }); });
+    state.now = p.now === '1';
+    if (p.q) state.q = p.q;
+    if (/^(avail|exp|pickdi|tier)$/.test(p.sort || '')) state.sort = p.sort;
+    return p;
+  }
+
+  /* ---------- staff pick mode (?pick=1): choose people, copy a shortlist link ---------- */
+  function pickWrap(p) {
+    var on = state.picked.has(p.member_id);
+    return '<div class="pt-pickwrap' + (on ? ' pt-picked' : '') + '"><button type="button" class="pt-pick" data-pick="' + esc(p.member_id) + '" aria-pressed="' + on + '" aria-label="' + esc(p.name_en) + ' 선택">' + (on ? '✓' : '') + '</button>' + rowHtml(p) + '</div>';
+  }
+  function pickBar() {
+    var n = state.picked.size;
+    return '<div class="pt-pickbar"><span><b>' + n + '명</b> 선택 · 추천 링크 만들기</span>' +
+      '<span><button type="button" class="pt-x" data-pickclear="1"' + (n ? '' : ' disabled') + '>선택 해제</button>' +
+      '<button type="button" class="pt-btn pt-btn-primary" data-pickcopy="1"' + (n ? '' : ' disabled') + '>링크 복사</button></span></div>';
+  }
+  function shortlistUrl() { return location.origin + location.pathname + '?ids=' + Array.from(state.picked).join(','); }
+  function copyText(text, msg) {
+    var done = function () { toast(msg); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () { fallback(); });
+    else fallback();
+    function fallback() { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (err) { window.prompt('링크를 복사하세요', text); } document.body.removeChild(ta); }
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = root.querySelector('.pt-toast'); if (!el) return;
+    el.textContent = msg; el.classList.add('pt-toast-on');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('pt-toast-on'); }, 2200);
+  }
+  function shareProfile(id) {
+    var p = state.all.filter(function (x) { return x.member_id === id; })[0] || {};
+    var url = location.origin + location.pathname + '#' + slug(id);
+    track('share_profile', profileParams(id));
+    var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (touch && navigator.share) {
+      navigator.share({ title: (p.job_title || '픽디 인재') + ' · 픽디 탤런트 풀', url: url }).catch(function () {});
+    } else {
+      copyText(url, '링크가 복사되었습니다');
+    }
   }
   function opt(v, label) { return '<option value="' + v + '"' + (state.sort === v ? ' selected' : '') + '>' + label + '</option>'; }
   function mobileWrap(html) {
@@ -144,10 +214,7 @@
       '<b>' + n.toFixed(1) + '</b></span>';
   }
   function busy(p) { return String(p.in_discussion).toUpperCase() === 'TRUE'; }
-  function availBadge(p) {
-    return busy(p) ? '<span class="pt-badge pt-badge-wait">다른 고객사와 논의 중</span>'
-      : '<span class="pt-badge pt-badge-ok">' + esc(p.availability_label || '') + '</span>';
-  }
+  function availBadge(p) { return '<span class="pt-badge pt-badge-ok">' + esc(p.availability_label || '') + '</span>'; }
   function tierBadge(p) { return p.tier ? '<span class="pt-badge pt-badge-tier pt-tier-' + (TIER_ORDER[p.tier] || 0) + '" title="픽디 추천 등급">' + esc(p.tier) + '</span>' : ''; }
 
   function rowHtml(p) {
@@ -221,7 +288,10 @@
 
     return '<div class="pt-scrim" data-close="1"></div>' +
       '<aside class="pt-sheet" role="dialog" aria-modal="true" aria-labelledby="pt-d-title">' +
-        '<div class="pt-sheet-top"><span class="pt-note">' + esc(p.member_id) + '</span><button type="button" class="pt-x" data-close="1">닫기</button></div>' +
+        '<div class="pt-sheet-top"><span class="pt-note">' + esc(p.member_id) + '</span><span class="pt-top-actions">' +
+          '<button type="button" class="pt-x pt-share" data-share="' + esc(p.member_id) + '" aria-label="이 인재 링크 공유">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>공유</button>' +
+          '<button type="button" class="pt-x" data-close="1">닫기</button></span></div>' +
         '<div class="pt-sheet-body">' +
           '<div class="pt-d-head"><div class="pt-row-top"><div class="pt-meta">' +
             list(p.field_tags).map(function (t) { return '<span class="pt-tag pt-tag-strong">' + esc(t) + '</span>'; }).join('') +
@@ -230,7 +300,7 @@
           '<div class="pt-cta"><a class="pt-btn pt-btn-primary" data-ga="match_request" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
             (safeUrl(p.cv_url) ? '<a class="pt-btn" data-ga="cv" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
           '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 일정은 매칭 신청 후 다시 확인해드립니다.</p>' +
-          (isBusy ? '<p class="pt-note" style="margin-top:6px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
+          (isBusy ? '<p class="pt-hurry">다른 고객사도 검토 중이니, 서둘러 신청하세요.</p>' : '') +
           '</div>' +
           '<dl class="pt-kv">' + kv + '</dl>' +
           sec('자기소개', rich(p.self_intro), 'pt-intro') +
@@ -250,6 +320,13 @@
   root.addEventListener('click', function (e) {
     var tip = e.target.closest('[data-tip]');
     if (tip) { var w = tip.parentNode; var on = !w.classList.contains('pt-tip-open'); w.classList.toggle('pt-tip-open', on); tip.setAttribute('aria-expanded', on); if (on) track('tier_price_open', profileParams(state.open)); return; }
+    var sh = e.target.closest('[data-share]');
+    if (sh) return shareProfile(sh.dataset.share);
+    var pk = e.target.closest('[data-pick]');
+    if (pk) { var pid = pk.dataset.pick; state.picked.has(pid) ? state.picked.delete(pid) : state.picked.add(pid); return render(); }
+    if (e.target.closest('[data-pickclear]')) { state.picked.clear(); return render(); }
+    if (e.target.closest('[data-pickcopy]')) { track('shortlist_link_copy', { count: state.picked.size }); return copyText(shortlistUrl(), state.picked.size + '명 추천 링크가 복사되었습니다'); }
+    if (e.target.closest('[data-all]')) { e.preventDefault(); state.ids = null; track('shortlist_view_all', {}); return render(); }
     var ga = e.target.closest('a[data-ga]');
     if (ga) {
       var params = profileParams(state.open);
@@ -286,7 +363,6 @@
   function openDetail(id) {
     state.open = id;
     if (id) track('view_profile', Object.assign(profileParams(id), { source: 'list' }));
-    try { history.replaceState(null, '', id ? '#' + slug(id) : location.pathname + location.search); } catch (err) {}
     document.documentElement.style.overflow = id ? 'hidden' : '';
     render();
     if (id) { var x = root.querySelector('.pt-x'); if (x) x.focus(); }
@@ -299,6 +375,8 @@
   root.innerHTML = '<div class="pt-wrap"><p class="pt-loading">인재 목록을 불러오는 중입니다…</p></div>';
   load().then(function (json) {
     state.all = (json && json.profiles) || [];
+    readUrl();
+    if (state.ids) track('shortlist_view', { count: state.ids.length, ids: state.ids.join(',') });
     var fromQuery = (location.search.match(/[?&]id=([^&]+)/) || [])[1];
     var id = fromQuery ? decodeURIComponent(fromQuery).toUpperCase() : (location.hash ? idFromSlug(location.hash) : null);
     if (id && state.all.some(function (p) { return p.member_id === id; })) { state.open = id; track('view_profile', Object.assign(profileParams(id), { source: 'direct_link' })); }
