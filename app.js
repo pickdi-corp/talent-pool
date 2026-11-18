@@ -92,7 +92,7 @@
         '<header class="pt-head"><div><p class="pt-eyebrow">PICKDI TALENT POOL</p>' +
           '<h1 class="pt-title">픽디 탤런트 풀</h1>' +
           '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, 매칭을 신청해 보세요.</p>' +
-          '<p class="pt-disclaimer">' + (lastUpdate ? '최종 업데이트 ' + esc(lastUpdate.replace(/-/g, '.')) + ' · ' : '') + '최종 매칭 가능 여부와 시작 일정은 매칭 신청 후 픽디가 다시 확인해 안내드립니다.</p></div>' +
+          '<p class="pt-disclaimer">' + (lastUpdate ? '최종 업데이트 ' + esc(lastUpdate.replace(/-/g, '.')) + ' · ' : '') + '최종 가능 여부와 일정은 매칭 신청 후 다시 확인해드립니다.</p></div>' +
           '<div class="pt-facts"><div class="pt-fact"><b>' + state.all.length + '</b><span>등록 인재</span></div>' +
           '<div class="pt-fact"><b>' + nowCount + '</b><span>즉시 가능</span></div></div></header>' +
         '<div class="pt-grid">' +
@@ -179,6 +179,19 @@
   function sec(title, body, cls) { return body ? '<section class="pt-sec' + (cls ? ' ' + cls : '') + '"><h3>' + esc(title) + '</h3>' + body + '</section>' : ''; }
   function ul(s) { var l = lines(s); return l.length ? '<ul>' + l.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; }
   function para(s) { return s ? '<p>' + esc(s) + '</p>' : ''; }
+  // "- " / "• " 로 시작하는 줄은 동그라미 목록으로, 나머지는 문단으로
+  function rich(s) {
+    if (!s) return '';
+    var out = '', items = [];
+    String(s).split(/\n/).forEach(function (line) {
+      var m = line.match(/^\s*[-•·*]\s+(.*)$/);
+      if (m) { items.push(m[1]); return; }
+      if (items.length) { out += '<ul>' + items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'; items = []; }
+      if (line.trim()) out += '<p>' + esc(line) + '</p>';
+    });
+    if (items.length) out += '<ul>' + items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+    return out;
+  }
   function file(url, label, sub) { url = safeUrl(url); return url ? '<a class="pt-file" href="' + esc(url) + '" target="_blank" rel="noopener"><span><b>' + esc(label) + '</b>' + (sub ? '<br><small>' + esc(sub) + '</small>' : '') + '</span><span aria-hidden="true">↗</span></a>' : ''; }
 
   function detailHtml(id) {
@@ -212,16 +225,16 @@
           '<div class="pt-d-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</div>' +
           '<div class="pt-cta"><a class="pt-btn pt-btn-primary" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
             (safeUrl(p.cv_url) ? '<a class="pt-btn" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
-          '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 시작 일정은 매칭 신청 후 픽디가 다시 확인해 안내드립니다.</p>' +
+          '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 일정은 매칭 신청 후 다시 확인해드립니다.</p>' +
           (isBusy ? '<p class="pt-note" style="margin-top:6px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
           '</div>' +
           '<dl class="pt-kv">' + kv + '</dl>' +
-          sec('자기소개', para(p.self_intro), 'pt-intro') +
-          sec('픽디 코멘트', (score(p) !== null ? '<p class="pt-score-line">픽디 추천 점수 <b>' + score(p).toFixed(1) + '점</b> <small>/ 5점</small> ' + stars(p, true) + '</p>' : '') + para(p.pickdi_comment), 'pt-quote') +
+          sec('자기소개', rich(p.self_intro), 'pt-intro') +
+          sec('픽디 코멘트', (score(p) !== null ? '<p class="pt-score-line">픽디 추천 점수 <b>' + score(p).toFixed(1) + '점</b> <small>/ 5점</small> ' + stars(p, true) + '</p>' : '') + rich(p.pickdi_comment), 'pt-quote') +
           sec('주요 경력', ul(careerLines(p).join('\n'))) +
           sec('주요 업무', ul(p.past_tasks)) +
           sec('주요 성과', ul(p.key_achievements)) +
-          sec('언어', para(p.language_notes)) +
+          sec('언어 추가 정보', rich(p.language_notes)) +
           sec('이전 계약 종료 사유', para(p.end_reason)) +
           sec('이력서·포트폴리오', files ? '<div class="pt-files">' + files + '</div>' : '', 'pt-card') +
           sec('채용 정보', (para(p.hiring_eval_summary) + (hireFiles ? '<div class="pt-files" style="margin-top:12px">' + hireFiles + '</div>' : '')), 'pt-card') +
