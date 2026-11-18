@@ -142,9 +142,7 @@
 #pt-root .pt-score-line small { color: var(--pt-ink-3); }
 #pt-root .pt-row-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 2px; }
 #pt-root .pt-row-sub .pt-stars { margin-top: 0; }
-#pt-root .pt-row-sub .pt-confirm { margin-top: 0; }
-#pt-root .pt-confirm { display: block; font-size: 12px; color: var(--pt-ink-3); margin-top: 2px; }
-#pt-root .pt-confirm-stale { color: var(--pt-warn); }
+#pt-root .pt-kv-sub { font-size: 11px; color: var(--pt-ink-3); font-weight: 400; white-space: nowrap; }
 #pt-root .pt-disclaimer { font-size: 12px; color: var(--pt-ink-3); margin: 8px 0 0; max-width: 62ch; }
 #pt-root .pt-card { border: 1px solid var(--pt-line); border-radius: var(--pt-radius); padding: 16px 18px; background: var(--pt-bg); }
 #pt-root .pt-card .pt-note { margin-top: 8px; }
