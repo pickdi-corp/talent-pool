@@ -183,7 +183,8 @@
     var files = file(p.cv_url, '이력서 보기', '개인 연락처는 가려져 있습니다') +
       file(p.portfolio_url, '포트폴리오') +
       String(p.extra_portfolio || '').split(/[\s,]+/).map(function (u, i) { return file(u, '추가 포트폴리오' + (i ? ' ' + (i + 1) : '')); }).join('') +
-      file(p.assignment_url, p.assignment_title || '채용 과제', '픽디 채용 과정 과제') +
+      '';
+    var hireFiles = file(p.assignment_url, p.assignment_title || '채용 과제', '픽디 채용 과정 과제') +
       file(p.interview_url, p.interview_title || '면접 기록', '픽디 채용 과정 면접');
 
     return '<div class="pt-scrim" data-close="1"></div>' +
@@ -199,15 +200,15 @@
           (isBusy ? '<p class="pt-note" style="margin-top:10px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
           '</div>' +
           '<dl class="pt-kv">' + kv + '</dl>' +
+          sec('자기소개', para(p.self_intro)) +
           sec('픽디 코멘트', para(p.pickdi_comment), 'pt-quote') +
           sec('주요 경력', ul(careerLines(p).join('\n'))) +
           sec('주요 업무', ul(p.past_tasks)) +
           sec('주요 성과', ul(p.key_achievements)) +
+          sec('언어', para(p.language_notes)) +
           sec('이전 계약 종료 사유', para(p.end_reason)) +
-          sec('언어 참고', para(p.language_notes)) +
-          sec('채용 평가 요약', para(p.hiring_eval_summary)) +
-          sec('자기소개', para(p.self_intro) + '<p class="pt-note">본인이 직접 작성한 소개를 정리했습니다.</p>', 'pt-card') +
           sec('이력서·포트폴리오', files ? '<div class="pt-files">' + files + '</div>' : '', 'pt-card') +
+          sec('채용 정보', (para(p.hiring_eval_summary) + (hireFiles ? '<div class="pt-files" style="margin-top:12px">' + hireFiles + '</div>' : '')), 'pt-card') +
           '<p class="pt-note">최근 업데이트 ' + esc(p.last_updated) + ' · 고객사명은 일부 가려서 표시합니다.</p>' +
         '</div></aside>';
   }
