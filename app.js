@@ -86,11 +86,13 @@
     var rows = res.length ? res.map(rowHtml).join('') :
       (state.all.length ? '<div class="pt-empty">조건에 맞는 인재가 없습니다. 필터를 줄여 보세요.</div>' : '<div class="pt-empty">현재 소개 가능한 인재를 준비하고 있습니다. 곧 업데이트됩니다.</div>');
 
+    var lastUpdate = state.updated || state.all.map(function (x) { return String(x.last_updated || ''); }).sort().pop() || '';
     root.innerHTML =
       '<div class="pt-wrap">' +
         '<header class="pt-head"><div><p class="pt-eyebrow">PICKDI TALENT POOL</p>' +
           '<h1 class="pt-title">픽디 탤런트 풀</h1>' +
-          '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, 매칭을 신청해 보세요.</p></div>' +
+          '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, 매칭을 신청해 보세요.</p>' +
+          '<p class="pt-disclaimer">' + (lastUpdate ? '최종 업데이트 ' + esc(lastUpdate.replace(/-/g, '.')) + ' · ' : '') + '업무 가능 여부는 인재별 확인일 기준이며, 최종 매칭 가능 여부와 일정은 추가 확인이 필요합니다.</p></div>' +
           '<div class="pt-facts"><div class="pt-fact"><b>' + state.all.length + '</b><span>등록 인재</span></div>' +
           '<div class="pt-fact"><b>' + nowCount + '</b><span>즉시 가능</span></div></div></header>' +
         '<div class="pt-grid">' +
@@ -124,6 +126,23 @@
     return pickdi.concat(lines(p.career_summary).map(function (s) { return String(s).replace(/^[\s·•\-–]+/, ''); }).filter(Boolean));
   }
   function langs(v) { return list(v).join(', '); }
+  // 업무 가능 여부를 마지막으로 확인한 날짜 (30일이 지나면 재확인 필요)
+  var STALE_DAYS = 30;
+  function confirmInfo(p) {
+    var d = String(p.availability_confirmed_on || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return { date: '', stale: true, text: '가능 여부 확인 필요' };
+    var age = (Date.now() - new Date(d + 'T00:00:00+09:00').getTime()) / 864e5;
+    return { date: d, stale: age > STALE_DAYS, text: (age > STALE_DAYS ? '재확인 필요 · ' : '') + '가능 여부 확인 ' + d.replace(/-/g, '.') };
+  }
+  // 픽디 추천 점수 (0.0–5.0) → 별점
+  function score(p) { var n = parseFloat(p.pickdi_score); return isFinite(n) && n > 0 ? Math.min(5, Math.round(n * 10) / 10) : null; }
+  function stars(p, big) {
+    var n = score(p); if (n === null) return '';
+    return '<span class="pt-stars' + (big ? ' pt-stars-lg' : '') + '" role="img" aria-label="픽디 추천 점수 5점 만점에 ' + n.toFixed(1) + '점" title="픽디 추천 점수">' +
+      '<span class="pt-stars-bg" aria-hidden="true">★★★★★<span class="pt-stars-fg" style="width:' + (n / 5 * 100) + '%">★★★★★</span></span>' +
+      '<b>' + n.toFixed(1) + '</b></span>';
+  }
+  function confirmTag(p) { var c = confirmInfo(p); return '<span class="pt-confirm' + (c.stale ? ' pt-confirm-stale' : '') + '">' + esc(c.text) + '</span>'; }
   function busy(p) { return String(p.in_discussion).toUpperCase() === 'TRUE'; }
   function availBadge(p) {
     return busy(p) ? '<span class="pt-badge pt-badge-wait">다른 고객사와 논의 중</span>'
@@ -145,7 +164,7 @@
       (career.length ? '<div class="pt-career"><dt>주요 경력</dt><dd><ul>' + career.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></dd></div>' : '');
     return '<button type="button" class="pt-row" data-open="' + esc(p.member_id) + '">' +
       '<div class="pt-row-top"><div class="pt-row-head"><p class="pt-row-title">' + esc(p.job_title) + '</p>' + tierBadge(p) + '</div>' + availBadge(p) + '</div>' +
-      '<span class="pt-row-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</span>' +
+      '<span class="pt-row-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</span>' + '<div class="pt-row-sub">' + stars(p) + confirmTag(p) + '</div>' +
       '<dl class="pt-rowfacts">' + facts + '</dl>' +
       '<div class="pt-meta">' + tags + '</div>' +
     '</button>';
@@ -175,7 +194,7 @@
       return '<li><span>' + esc(m ? m[1] : h) + '</span><span>' + esc(m ? m[2] : '') + '</span></li>';
     }).join('');
     var kv = [
-      ['등급', p.tier], ['업무 시작', p.availability_label + (p.available_from && !isNow(p) ? '' : '')],
+      ['등급', p.tier], ['업무 시작', p.availability_label], ['가능 여부 확인일', confirmInfo(p).date ? confirmInfo(p).date.replace(/-/g, '.') + (confirmInfo(p).stale ? ' (재확인 필요)' : '') : '확인 필요'],
       ['총 경력', num(p.total_experience) ? p.total_experience + '년' : ''], ['픽디 협업', months(p).replace('픽디 ', '')],
       ['업무 가능 언어', langs(p.work_languages) || '확인 중'], ['회화 가능 언어', langs(p.speaking_languages) || '확인 중'],
       ['툴', p.tools], ['채널 경험', p.channels], ['산업 경험', p.client_industries]
@@ -197,11 +216,12 @@
           '<div class="pt-d-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</div>' +
           '<div class="pt-cta"><a class="pt-btn pt-btn-primary" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
             (safeUrl(p.cv_url) ? '<a class="pt-btn" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
-          (isBusy ? '<p class="pt-note" style="margin-top:10px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
+          '<p class="pt-note" style="margin-top:10px">업무 시작일과 매칭 가능 여부는 위 확인일 기준입니다. 최종 가능 여부와 일정은 매칭 신청 후 픽디가 다시 확인해 안내드립니다.</p>' +
+          (isBusy ? '<p class="pt-note" style="margin-top:6px">지금 다른 고객사와 논의 중입니다. 신청하시면 대기 순서로 접수되고, 진행이 끝나는 대로 연락드립니다.</p>' : '') +
           '</div>' +
           '<dl class="pt-kv">' + kv + '</dl>' +
-          sec('자기소개', para(p.self_intro)) +
-          sec('픽디 코멘트', para(p.pickdi_comment), 'pt-quote') +
+          sec('자기소개', para(p.self_intro), 'pt-intro') +
+          sec('픽디 코멘트', (score(p) !== null ? '<p class="pt-score-line">픽디 추천 점수 <b>' + score(p).toFixed(1) + '점</b> <small>/ 5점</small> ' + stars(p, true) + '</p>' : '') + para(p.pickdi_comment), 'pt-quote') +
           sec('주요 경력', ul(careerLines(p).join('\n'))) +
           sec('주요 업무', ul(p.past_tasks)) +
           sec('주요 성과', ul(p.key_achievements)) +
