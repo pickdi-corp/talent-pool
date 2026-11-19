@@ -306,7 +306,7 @@
 
     return '<div class="pt-scrim" data-close="1"></div>' +
       '<aside class="pt-sheet" role="dialog" aria-modal="true" aria-labelledby="pt-d-title">' +
-        '<div class="pt-sheet-top"><span class="pt-note">' + esc(p.member_id) + '</span><span class="pt-top-actions">' +
+        '<div class="pt-sheet-top"><span></span><span class="pt-top-actions">' +
           '<button type="button" class="pt-x pt-share" data-share="' + esc(p.member_id) + '" aria-label="이 인재 링크 공유">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>공유</button>' +
           '<button type="button" class="pt-x" data-close="1">닫기</button></span></div>' +
