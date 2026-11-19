@@ -6,7 +6,7 @@
   var root = document.getElementById('pt-root');
   if (!root) return;
 
-  var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'avail', open: null,
+  var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'score', open: null,
                 ids: null, pick: false, picked: new Set(), isNew: false, keep: [] };   // isNew: cold-mail visitor (?from=new), keep: from/utm params kept in the URL
   var CONSULT_URL = 'https://www.pickdi.co.kr/consult';
   function consultUrl(place, id) {
@@ -67,7 +67,11 @@
       }
       return true;
     });
+    var upd = function (p) { return String(p.availability_confirmed_on || p.last_updated || '').slice(0, 10); };
+    var byRecent = function (a, b) { return upd(b).localeCompare(upd(a)); };
     var by = {
+      score: function (a, b) { return (score(b) || 0) - (score(a) || 0) || byRecent(a, b); },
+      recent: function (a, b) { return byRecent(a, b) || (score(b) || 0) - (score(a) || 0); },
       avail: function (a, b) { return String(a.available_from).localeCompare(String(b.available_from)); },
       exp: function (a, b) { return (num(b.total_experience) || 0) - (num(a.total_experience) || 0); },
       pickdi: function (a, b) { return (num(b.months_at_pickdi) || 0) - (num(a.months_at_pickdi) || 0); },
@@ -121,7 +125,7 @@
           '<aside class="pt-filters" aria-label="필터">' + mobileWrap(filtersHtml) + '</aside>' +
           '<section aria-label="인재 목록"><div class="pt-bar"><span><b>' + res.length + '</b>명</span>' +
             '<label>정렬 <select id="pt-sort">' +
-              opt('avail', '업무 가능일 빠른 순') + opt('exp', '경력 많은 순') + opt('pickdi', '픽디 경력 많은 순') + opt('tier', '등급 높은 순') +
+              opt('score', '별점 높은 순') + opt('recent', '최신 업데이트 순') + opt('avail', '업무 가능일 빠른 순') + opt('exp', '경력 많은 순') + opt('pickdi', '픽디 경력 많은 순') + opt('tier', '등급 높은 순') +
             '</select></label></div><div class="pt-list">' + rows + '</div></section>' +
         '</div>' +
       '</div>' + (state.pick ? pickBar() : '') + (state.open ? detailHtml(state.open) : '') +
@@ -140,7 +144,7 @@
     });
     if (state.now) q.push('now=1');
     if (state.q.trim()) q.push('q=' + encodeURIComponent(state.q.trim()));
-    if (state.sort !== 'avail') q.push('sort=' + state.sort);
+    if (state.sort !== 'score') q.push('sort=' + state.sort);
     q = q.concat(state.keep);
     var url = location.pathname + (q.length ? '?' + q.join('&') : '') + (state.open ? '#' + slug(state.open) : '');
     if (url !== location.pathname + location.search + location.hash) { try { history.replaceState(null, '', url); } catch (err) {} }
@@ -154,7 +158,7 @@
     ['field', 'tier', 'channel'].forEach(function (k) { if (p[k]) p[k].split(SEP).forEach(function (v) { if (v) state[k].add(v); }); });
     state.now = p.now === '1';
     if (p.q) state.q = p.q;
-    if (/^(avail|exp|pickdi|tier)$/.test(p.sort || '')) state.sort = p.sort;
+    if (/^(score|recent|avail|exp|pickdi|tier)$/.test(p.sort || '')) state.sort = p.sort;
     // cold-mail visitors: ?from=new (remembered in this browser); keep from/utm_* in the address for analytics
     state.keep = location.search.replace(/^\?/, '').split('&').filter(function (kv) { return /^(from|utm_[a-z]+)=/.test(kv); });
     try { if (p.from === 'new') localStorage.setItem('pt_new_visitor', '1'); state.isNew = p.from === 'new' || localStorage.getItem('pt_new_visitor') === '1'; }
