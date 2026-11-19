@@ -103,10 +103,11 @@
     var lastUpdate = state.updated || state.all.map(function (x) { return String(x.last_updated || ''); }).sort().pop() || '';
     root.innerHTML =
       '<div class="pt-wrap">' +
-        (state.isNew ? '' : '<div class="pt-topbar"><a class="pt-consult" data-consult="top" href="' + esc(consultUrl('top')) + '" target="_blank" rel="noopener">픽디가 처음이신가요? <b>도입 상담</b> →</a></div>') +
-        (state.isNew ? '<div class="pt-shortlist pt-newbar"><div><b>픽디가 처음이신가요?</b>' +
+        (state.isNew && !state.newbarClosed ? '' : '<div class="pt-topbar"><a class="pt-consult" data-consult="top" href="' + esc(consultUrl('top')) + '" target="_blank" rel="noopener">픽디가 처음이신가요? <b>도입 상담</b> →</a></div>') +
+        (state.isNew && !state.newbarClosed ? '<div class="pt-shortlist pt-newbar"><div><b>픽디가 처음이신가요?</b>' +
           '<span>마음에 드는 인재를 둘러보신 뒤, 도입 상담에서 필요한 인재와 이용 방법을 안내받으세요.</span></div>' +
-          '<a class="pt-btn pt-btn-primary" data-consult="banner" href="' + esc(consultUrl('banner')) + '" target="_blank" rel="noopener">픽디 도입 상담 신청</a></div>' : '') +
+          '<span class="pt-newbar-actions"><a class="pt-btn pt-btn-primary" data-consult="banner" href="' + esc(consultUrl('banner')) + '" target="_blank" rel="noopener">픽디 도입 상담 신청</a>' +
+          '<button type="button" class="pt-newbar-x" data-newbar-close="1" aria-label="배너 닫기">×</button></span></div>' : '') +
         (state.ids ? '<div class="pt-shortlist"><div><b>픽디가 추천드리는 인재 ' + res.length + '명</b>' +
           '<span>요청하신 조건에 맞춰 골랐습니다. 마음에 드는 인재의 상세 화면에서 ' + (state.isNew ? '상담을' : '매칭을') + ' 신청해 주세요.</span></div>' +
           '<a href="' + esc(location.pathname) + '" data-all="1">전체 인재 보기</a></div>' : '') +
@@ -158,6 +159,7 @@
     state.keep = location.search.replace(/^\?/, '').split('&').filter(function (kv) { return /^(from|utm_[a-z]+)=/.test(kv); });
     try { if (p.from === 'new') localStorage.setItem('pt_new_visitor', '1'); state.isNew = p.from === 'new' || localStorage.getItem('pt_new_visitor') === '1'; }
     catch (err) { state.isNew = p.from === 'new'; }
+    try { state.newbarClosed = localStorage.getItem('pt_newbar_closed') === '1'; } catch (err) {}
     if (p.from === 'existing') { state.isNew = false; try { localStorage.removeItem('pt_new_visitor'); } catch (err) {} }
     return p;
   }
@@ -347,6 +349,10 @@
     if (e.target.closest('[data-pickclear]')) { state.picked.clear(); return render(); }
     if (e.target.closest('[data-pickcopy]')) { track('shortlist_link_copy', { count: state.picked.size }); return copyText(shortlistUrl(), state.picked.size + '명 추천 링크가 복사되었습니다'); }
     if (e.target.closest('[data-all]')) { e.preventDefault(); state.ids = null; track('shortlist_view_all', {}); return render(); }
+    if (e.target.closest('[data-newbar-close]')) {
+      state.newbarClosed = true; try { localStorage.setItem('pt_newbar_closed', '1'); } catch (err) {}
+      track('consult_banner_close', {}); return render();
+    }
     var cs = e.target.closest('a[data-consult]');
     if (cs) { var cp = state.open ? profileParams(state.open) : {}; cp.placement = cs.dataset.consult; cp.visitor = state.isNew ? 'new' : 'default'; track('consult_click', cp); return; }
     var ga = e.target.closest('a[data-ga]');
