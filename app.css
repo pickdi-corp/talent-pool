@@ -216,3 +216,11 @@
 #pt-root .pt-toast { position: fixed; left: 50%; top: 24px; transform: translate(-50%, -12px); z-index: 60; background: var(--pt-ink); color: var(--pt-surface);
   padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
 #pt-root .pt-toast.pt-toast-on { opacity: 1; transform: translate(-50%, 0); }
+
+/* Consult (new clients) */
+#pt-root .pt-topbar { display: flex; justify-content: flex-end; margin: -8px 0 14px; }
+#pt-root .pt-consult { font-size: 13px; color: var(--pt-ink-2); text-decoration: none; padding: 6px 12px; border: 1px solid var(--pt-line); border-radius: 999px; background: var(--pt-surface); }
+#pt-root .pt-consult b { color: var(--pt-accent); }
+#pt-root .pt-consult:hover { border-color: var(--pt-accent); }
+#pt-root .pt-newbar .pt-btn { white-space: nowrap; }
+#pt-root .pt-shortlist a.pt-btn-primary { color: #fff; }

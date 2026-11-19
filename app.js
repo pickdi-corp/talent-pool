@@ -7,7 +7,15 @@
   if (!root) return;
 
   var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'avail', open: null,
-                ids: null, pick: false, picked: new Set() };   // ids: shortlist from ?ids=, pick: staff selection mode (?pick=1)
+                ids: null, pick: false, picked: new Set(), isNew: false, keep: [] };   // isNew: cold-mail visitor (?from=new), keep: from/utm params kept in the URL
+  var CONSULT_URL = 'https://www.pickdi.co.kr/consult';
+  function consultUrl(place, id) {
+    var q = ['utm_source=talentpool', 'utm_medium=' + place];
+    var camp = state.keep.filter(function (kv) { return /^utm_campaign=/.test(kv); })[0];
+    if (camp) q.push(camp);
+    if (id) q.push('talent=' + encodeURIComponent(id));
+    return CONSULT_URL + '?' + q.join('&');
+  }   // ids: shortlist from ?ids=, pick: staff selection mode (?pick=1)
   var TIER_ORDER = { '신입': 1, '스탠다드': 2, '프로': 3 };
   // 티어별 월 서비스 이용료 (부가세 별도, 월 21일·168시간 기준)
   var TIER_PRICE = [['신입', '99만원'], ['스탠다드', '139만원'], ['프로', '189만원']];
@@ -95,13 +103,17 @@
     var lastUpdate = state.updated || state.all.map(function (x) { return String(x.last_updated || ''); }).sort().pop() || '';
     root.innerHTML =
       '<div class="pt-wrap">' +
+        (state.isNew ? '' : '<div class="pt-topbar"><a class="pt-consult" data-consult="top" href="' + esc(consultUrl('top')) + '" target="_blank" rel="noopener">픽디가 처음이신가요? <b>도입 상담</b> →</a></div>') +
+        (state.isNew ? '<div class="pt-shortlist pt-newbar"><div><b>픽디가 처음이신가요?</b>' +
+          '<span>마음에 드는 인재를 둘러보신 뒤, 도입 상담에서 필요한 인재와 이용 방법을 안내받으세요.</span></div>' +
+          '<a class="pt-btn pt-btn-primary" data-consult="banner" href="' + esc(consultUrl('banner')) + '" target="_blank" rel="noopener">픽디 도입 상담 신청</a></div>' : '') +
         (state.ids ? '<div class="pt-shortlist"><div><b>픽디가 추천드리는 인재 ' + res.length + '명</b>' +
-          '<span>요청하신 조건에 맞춰 골랐습니다. 마음에 드는 인재의 상세 화면에서 매칭을 신청해 주세요.</span></div>' +
+          '<span>요청하신 조건에 맞춰 골랐습니다. 마음에 드는 인재의 상세 화면에서 ' + (state.isNew ? '상담을' : '매칭을') + ' 신청해 주세요.</span></div>' +
           '<a href="' + esc(location.pathname) + '" data-all="1">전체 인재 보기</a></div>' : '') +
         '<header class="pt-head"><div><p class="pt-eyebrow">PICKDI TALENT POOL</p>' +
           '<h1 class="pt-title">픽디 탤런트 풀</h1>' +
-          '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, 매칭을 신청해 보세요.</p>' +
-          '<p class="pt-disclaimer">' + (lastUpdate ? '최종 업데이트 ' + esc(lastUpdate.replace(/-/g, '.')) + ' · ' : '') + '최종 가능 여부와 일정은 매칭 신청 후 다시 확인해드립니다.</p></div>' +
+          '<p class="pt-lead">매칭 가능한 픽디 인력 풀을 소개합니다. 모두 픽디를 통해 한국 고객사와 실제로 업무한 경험이 있습니다. 고객사에 적합한 인재를 찾고, ' + (state.isNew ? '도입 상담을' : '매칭을') + ' 신청해 보세요.</p>' +
+          '<p class="pt-disclaimer">' + (lastUpdate ? '최종 업데이트 ' + esc(lastUpdate.replace(/-/g, '.')) + ' · ' : '') + '최종 가능 여부와 일정은 ' + (state.isNew ? '상담' : '매칭 신청') + ' 후 다시 확인해드립니다.</p></div>' +
           '<div class="pt-facts"><div class="pt-fact"><b>' + state.all.length + '</b><span>등록 인재</span></div>' +
           '<div class="pt-fact"><b>' + nowCount + '</b><span>즉시 가능</span></div></div></header>' +
         '<div class="pt-grid">' +
@@ -128,6 +140,7 @@
     if (state.now) q.push('now=1');
     if (state.q.trim()) q.push('q=' + encodeURIComponent(state.q.trim()));
     if (state.sort !== 'avail') q.push('sort=' + state.sort);
+    q = q.concat(state.keep);
     var url = location.pathname + (q.length ? '?' + q.join('&') : '') + (state.open ? '#' + slug(state.open) : '');
     if (url !== location.pathname + location.search + location.hash) { try { history.replaceState(null, '', url); } catch (err) {} }
   }
@@ -141,6 +154,11 @@
     state.now = p.now === '1';
     if (p.q) state.q = p.q;
     if (/^(avail|exp|pickdi|tier)$/.test(p.sort || '')) state.sort = p.sort;
+    // cold-mail visitors: ?from=new (remembered in this browser); keep from/utm_* in the address for analytics
+    state.keep = location.search.replace(/^\?/, '').split('&').filter(function (kv) { return /^(from|utm_[a-z]+)=/.test(kv); });
+    try { if (p.from === 'new') localStorage.setItem('pt_new_visitor', '1'); state.isNew = p.from === 'new' || localStorage.getItem('pt_new_visitor') === '1'; }
+    catch (err) { state.isNew = p.from === 'new'; }
+    if (p.from === 'existing') { state.isNew = false; try { localStorage.removeItem('pt_new_visitor'); } catch (err) {} }
     return p;
   }
 
@@ -297,9 +315,11 @@
             list(p.field_tags).map(function (t) { return '<span class="pt-tag pt-tag-strong">' + esc(t) + '</span>'; }).join('') +
           '</div>' + availBadge(p) + '</div><div class="pt-row-head"><h2 id="pt-d-title">' + esc(p.job_title) + '</h2>' + tierBadge(p) + tierInfo(p) + '</div>' +
           '<div class="pt-d-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</div>' +
-          '<div class="pt-cta"><a class="pt-btn pt-btn-primary" data-ga="match_request" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>' +
+          '<div class="pt-cta">' + (state.isNew
+            ? '<a class="pt-btn pt-btn-primary" data-consult="detail" href="' + esc(consultUrl('detail', p.member_id)) + '" target="_blank" rel="noopener">픽디 도입 상담 신청</a>'
+            : '<a class="pt-btn pt-btn-primary" data-ga="match_request" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>') +
             (safeUrl(p.cv_url) ? '<a class="pt-btn" data-ga="cv" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
-          '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 일정은 매칭 신청 후 다시 확인해드립니다.</p>' +
+          '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 일정은 ' + (state.isNew ? '상담' : '매칭 신청') + ' 후 다시 확인해드립니다.</p>' +
           (isBusy ? '<p class="pt-hurry">다른 고객사도 검토 중이니, 서둘러 신청하세요.</p>' : '') +
           '</div>' +
           '<dl class="pt-kv">' + kv + '</dl>' +
@@ -327,6 +347,8 @@
     if (e.target.closest('[data-pickclear]')) { state.picked.clear(); return render(); }
     if (e.target.closest('[data-pickcopy]')) { track('shortlist_link_copy', { count: state.picked.size }); return copyText(shortlistUrl(), state.picked.size + '명 추천 링크가 복사되었습니다'); }
     if (e.target.closest('[data-all]')) { e.preventDefault(); state.ids = null; track('shortlist_view_all', {}); return render(); }
+    var cs = e.target.closest('a[data-consult]');
+    if (cs) { var cp = state.open ? profileParams(state.open) : {}; cp.placement = cs.dataset.consult; cp.visitor = state.isNew ? 'new' : 'default'; track('consult_click', cp); return; }
     var ga = e.target.closest('a[data-ga]');
     if (ga) {
       var params = profileParams(state.open);
