@@ -249,8 +249,8 @@
     var facts =
       '<div class="pt-facts-row">' +
         (exp ? '<div><dt>경력</dt><dd>' + esc(exp) + '</dd></div>' : '') +
-        '<div><dt>업무 가능 언어</dt><dd>' + (langs(p.work_languages) ? esc(langs(p.work_languages)) : '<span class="pt-muted">확인 중</span>') + '</dd></div>' +
-        '<div><dt>회화 가능 언어</dt><dd>' + (langs(p.speaking_languages) ? esc(langs(p.speaking_languages)) : '<span class="pt-muted">확인 중</span>') + '</dd></div>' +
+        '<div><dt>업무 가능 언어</dt><dd>' + (langs(p.work_languages) ? esc(langs(p.work_languages)) : '베트남어') + '</dd></div>' +
+        '<div><dt>회화 가능 언어</dt><dd>' + (langs(p.speaking_languages) ? esc(langs(p.speaking_languages)) : '베트남어') + '</dd></div>' +
       '</div>' +
       (career.length ? '<div class="pt-career"><dt>주요 경력</dt><dd><ul>' + career.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul></dd></div>' : '');
     return '<button type="button" class="pt-row" data-open="' + esc(p.member_id) + '">' +
@@ -300,7 +300,7 @@
     var kv = [
       ['등급', p.tier], ['업무 시작', p.availability_label, updatedOn(p) ? updatedOn(p) + ' 업데이트' : ''],
       ['총 경력', num(p.total_experience) ? p.total_experience + '년' : ''], ['픽디 협업', months(p).replace('픽디 ', '')],
-      ['업무 가능 언어', langs(p.work_languages) || '확인 중'], ['회화 가능 언어', langs(p.speaking_languages) || '확인 중'],
+      ['업무 가능 언어', langs(p.work_languages) || '베트남어'], ['회화 가능 언어', langs(p.speaking_languages) || '베트남어'],
       ['툴', p.tools], ['채널 경험', p.channels], ['산업 경험', p.client_industries]
     ].filter(function (x) { return x[1]; }).map(function (x) { return '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + (x[2] ? ' <small class="pt-kv-sub">' + esc(x[2]) + '</small>' : '') + '</dd></div>'; }).join('');
     var files = file(p.cv_url, '이력서 보기', '개인 연락처는 가려져 있습니다', 'cv') +
