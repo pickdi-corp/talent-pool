@@ -307,6 +307,7 @@
       file(p.portfolio_url, '포트폴리오', '', 'portfolio') +
       String(p.extra_portfolio || '').split(/[\s,]+/).map(function (u, i) { return file(u, '추가 포트폴리오' + (i ? ' ' + (i + 1) : ''), '', 'extra_portfolio'); }).join('') +
       '';
+    var pf = safeUrl(p.portfolio_url) || String(p.extra_portfolio || '').split(/[\s,]+/).map(safeUrl).filter(Boolean)[0] || '';
     var hireFiles = file(p.assignment_url, p.assignment_title || '채용 과제', '픽디 채용 과정 과제', 'assignment') +
       file(p.interview_url, p.interview_title || '면접 기록', '픽디 채용 과정 면접', 'interview');
 
@@ -324,7 +325,8 @@
           '<div class="pt-cta">' + (state.isNew
             ? '<a class="pt-btn pt-btn-primary" data-consult="detail" href="' + esc(consultUrl('detail', p.member_id)) + '" target="_blank" rel="noopener">픽디 도입 상담 신청</a>'
             : '<a class="pt-btn pt-btn-primary" data-ga="match_request" href="' + esc(FORM_URL + encodeURIComponent(p.member_id)) + '" target="_blank" rel="noopener">이 인재로 매칭 신청</a>') +
-            (safeUrl(p.cv_url) ? '<a class="pt-btn" data-ga="cv" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') + '</div>' +
+            (safeUrl(p.cv_url) ? '<a class="pt-btn" data-ga="cv" href="' + esc(safeUrl(p.cv_url)) + '" target="_blank" rel="noopener">이력서 보기</a>' : '') +
+            (pf ? '<a class="pt-btn" data-ga="portfolio" href="' + esc(pf) + '" target="_blank" rel="noopener">포트폴리오 보기</a>' : '') + '</div>' +
           '<p class="pt-note" style="margin-top:10px">' + (updatedOn(p) ? esc(updatedOn(p)) + ' 기준의 정보입니다. ' : '') + '최종 가능 여부와 일정은 ' + (state.isNew ? '상담' : '매칭 신청') + ' 후 다시 확인해드립니다.</p>' +
           (isBusy ? '<p class="pt-hurry">다른 고객사도 검토 중이니, 서둘러 신청하세요.</p>' : '') +
           '</div>' +
