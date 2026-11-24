@@ -69,8 +69,11 @@
     });
     var upd = function (p) { return String(p.availability_confirmed_on || p.last_updated || '').slice(0, 10); };
     var byRecent = function (a, b) { return upd(b).localeCompare(upd(a)); };
+    // 업무 시작: 즉시 가능 먼저, 그다음 시작일 빠른 순, 날짜 없으면 맨 뒤
+    var startKey = function (p) { return isNow(p) ? '0' : (/^\d{4}-\d{2}-\d{2}/.test(String(p.available_from || '')) ? '1' + p.available_from : '9'); };
+    var byStart = function (a, b) { return startKey(a).localeCompare(startKey(b)); };
     var by = {
-      score: function (a, b) { return (score(b) || 0) - (score(a) || 0) || byRecent(a, b); },
+      score: function (a, b) { return (score(b) || 0) - (score(a) || 0) || byStart(a, b) || byRecent(a, b); },
       recent: function (a, b) { return byRecent(a, b) || (score(b) || 0) - (score(a) || 0); },
       avail: function (a, b) { return String(a.available_from).localeCompare(String(b.available_from)); },
       exp: function (a, b) { return (num(b.total_experience) || 0) - (num(a.total_experience) || 0); },
