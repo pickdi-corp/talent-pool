@@ -1,0 +1,40 @@
+name: Refresh talent snapshot
+# Copies the live talent list (Live profiles only, already masked) to data.json so the page opens fast.
+# The page still fetches the live API in the background, so edits show up even between runs.
+on:
+  schedule:
+    - cron: "*/15 0-14 * * 1-6"   # every 15 min, 09:00-23:59 KST, Mon-Sat
+    - cron: "0 */3 * * *"          # every 3 hours otherwise
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: snapshot
+  cancel-in-progress: true
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch live data
+        run: |
+          curl -sSL --fail --max-time 60 "${{ vars.TALENT_API_URL || 'https://script.google.com/macros/s/AKfycbxWulDnuKnFhBIceIOF5KLJhvq-H3IRyr0_Q3crQFOjXqMRYDQO1ILjVDe8GEWzOxDP/exec' }}" -o new.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('new.json'))
+          n = len(d.get('profiles') or [])
+          if n == 0:
+              sys.exit('empty profile list - keeping the old snapshot')
+          d.pop('updated', None)  # avoid a commit when nothing changed
+          json.dump(d, open('data.json', 'w'), ensure_ascii=False, separators=(',', ':'))
+          print('profiles:', n)
+          PY
+          rm new.json
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- data.json && git ls-files --error-unmatch data.json >/dev/null 2>&1; then echo "no change"; exit 0; fi
+          git config user.name "pickdi-snapshot-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json
+          git commit -m "Refresh talent snapshot"
+          git push
