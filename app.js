@@ -212,9 +212,10 @@
     }
   }
   function opt(v, label) { return '<option value="' + v + '"' + (state.sort === v ? ' selected' : '') + '>' + label + '</option>'; }
+  function activeCount() { return state.field.size + state.tier.size + state.channel.size + (state.now ? 1 : 0); }
   function mobileWrap(html) {
     return window.matchMedia('(max-width: 860px)').matches
-      ? '<details' + (state.mobileOpen ? ' open' : '') + ' id="pt-fdetails"><summary>필터</summary><div style="display:flex;flex-direction:column;gap:18px;margin-top:14px">' + html + '</div></details>'
+      ? '<details' + (state.mobileOpen ? ' open' : '') + ' id="pt-fdetails"><summary><span class="pt-sum-l"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>필터' + (activeCount() ? ' <b class="pt-sum-n">' + activeCount() + '</b>' : '') + '</span><span class="pt-sum-r"><span class="pt-sum-closed">분야·등급·채널 선택</span><span class="pt-sum-open">접기</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></summary><div style="display:flex;flex-direction:column;gap:18px;margin-top:14px">' + html + '</div></details>'
       : html;
   }
 
@@ -266,6 +267,7 @@
       '<span class="pt-row-name">' + esc(p.name_en) + (p.name_vn ? ' · ' + esc(p.name_vn) : '') + '</span>' + '<div class="pt-row-sub">' + stars(p) + '</div>' +
       '<dl class="pt-rowfacts">' + facts + '</dl>' +
       '<div class="pt-meta">' + tags + '</div>' +
+      '<span class="pt-row-more">프로필 자세히 보기<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>' +
     '</button>';
   }
 
