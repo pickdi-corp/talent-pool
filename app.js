@@ -42,10 +42,15 @@
   }
 
   /* ---------- load ---------- */
-  function load() {
-    if (CFG.data) return Promise.resolve(CFG.data);
-    return fetch(API_URL, { redirect: 'follow' }).then(function (r) { return r.json(); });
-  }
+  // Data: 1) this browser's last copy (instant)  2) data.json snapshot on the same server (fast)
+  //       3) live API in the background (always the latest; quietly refreshes the list when it differs)
+  var CACHE_KEY = 'pt_data_v1';
+  function valid(j) { return j && j.profiles && j.profiles.length ? j : null; }
+  function readCache() { try { var c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return c && Date.now() - c.t < 7 * 864e5 ? valid(c.d) : null; } catch (err) { return null; } }
+  function writeCache(j) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), d: j })); } catch (err) {} }
+  function getJson(url) { return fetch(url, { redirect: 'follow', cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(valid); }
+  function loadLive() { return CFG.data ? Promise.resolve(CFG.data) : getJson(API_URL); }
+  function loadSnapshot() { return CFG.data ? Promise.resolve(null) : getJson('data.json').catch(function () { return null; }); }
 
   function counts(key, splitter) {
     var m = {};
@@ -409,17 +414,46 @@
     if (id !== state.open) { state.open = id && state.all.some(function (p) { return p.member_id === id; }) ? id : null; render(); }
   });
 
-  root.innerHTML = '<div class="pt-wrap"><p class="pt-loading">인재 목록을 불러오는 중입니다…</p></div>';
-  load().then(function (json) {
-    state.all = (json && json.profiles) || [];
-    readUrl();
-    if (state.ids) track('shortlist_view', { count: state.ids.length, ids: state.ids.join(',') });
-    var fromQuery = (location.search.match(/[?&]id=([^&]+)/) || [])[1];
-    var id = fromQuery ? decodeURIComponent(fromQuery).toUpperCase() : (location.hash ? idFromSlug(location.hash) : null);
-    if (id && state.all.some(function (p) { return p.member_id === id; })) { state.open = id; track('view_profile', Object.assign(profileParams(id), { source: 'direct_link' })); }
-    track('talent_list_loaded', { profile_count: state.all.length });
+  function skeleton() {
+    var card = '<div class="pt-sk-card"><div class="pt-sk pt-sk-l" style="width:30%"></div><div class="pt-sk pt-sk-h" style="width:55%"></div><div class="pt-sk pt-sk-l" style="width:40%"></div><div class="pt-sk pt-sk-l" style="width:85%"></div><div class="pt-sk pt-sk-l" style="width:70%"></div></div>';
+    return '<div class="pt-wrap pt-sk-wrap" aria-busy="true" aria-label="인재 목록을 불러오는 중"><div class="pt-sk pt-sk-title"></div><div class="pt-sk pt-sk-l" style="width:45%;margin-bottom:28px"></div>' +
+      '<div class="pt-grid"><aside class="pt-filters"><div class="pt-sk-card"><div class="pt-sk pt-sk-l" style="width:40%"></div><div class="pt-sk pt-sk-l"></div><div class="pt-sk pt-sk-l" style="width:80%"></div><div class="pt-sk pt-sk-l" style="width:60%"></div></div></aside>' +
+      '<section><div class="pt-list">' + card + card + card + card + '</div></section></div></div>';
+  }
+
+  var started = false, lastSig = '';
+  function apply(json, fresh) {
+    if (!json) return;
+    var sig = JSON.stringify(json.profiles);
+    if (sig === lastSig) return;
+    lastSig = sig;
+    state.all = json.profiles;
+    if (!started) {
+      started = true;
+      readUrl();
+      if (state.ids) track('shortlist_view', { count: state.ids.length, ids: state.ids.join(',') });
+      var fromQuery = (location.search.match(/[?&]id=([^&]+)/) || [])[1];
+      var id = fromQuery ? decodeURIComponent(fromQuery).toUpperCase() : (location.hash ? idFromSlug(location.hash) : null);
+      if (id && state.all.some(function (p) { return p.member_id === id; })) { state.open = id; track('view_profile', Object.assign(profileParams(id), { source: 'direct_link' })); }
+      track('talent_list_loaded', { profile_count: state.all.length });
+    } else if (state.open && !state.all.some(function (p) { return p.member_id === state.open; })) {
+      state.open = null;
+    }
+    var y = window.scrollY;
     render();
-  }).catch(function () {
-    root.innerHTML = '<div class="pt-wrap"><div class="pt-empty">인재 목록을 불러오지 못했습니다. 잠시 후 새로고침해 주세요. 계속 안 되면 픽디 담당 매니저에게 알려주세요.</div></div>';
+    if (fresh) window.scrollTo(0, y);
+  }
+
+  root.innerHTML = skeleton();
+  var cached = readCache();
+  if (cached) apply(cached);
+  var live = loadLive().then(function (j) { if (j) { writeCache(j); apply(j, true); } return j; }).catch(function () { return null; });
+  if (!cached) loadSnapshot().then(function (j) { if (!started && j) apply(j); });
+  live.then(function (j) {
+    if (j || started) return;
+    return loadSnapshot().then(function (s) {
+      if (s) return apply(s);
+      root.innerHTML = '<div class="pt-wrap"><div class="pt-empty">인재 목록을 불러오지 못했습니다. 잠시 후 새로고침해 주세요. 계속 안 되면 픽디 담당 매니저에게 알려주세요.</div></div>';
+    });
   });
 })();

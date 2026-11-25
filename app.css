@@ -12,7 +12,7 @@
   --pt-ok-soft: #e4f4ec;
   --pt-warn: #9a5a00;
   --pt-warn-soft: #fbf0dc;
-  --pt-font: "Noto Sans KR", "Pretendard", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --pt-font: "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --pt-radius: 10px;
   color-scheme: light;
   font-family: var(--pt-font);
@@ -229,3 +229,13 @@
 #pt-root .pt-newbar-x:hover { background: rgba(0,0,0,.06); color: var(--pt-ink); }
 #pt-root .pt-newbar { position: relative; }
 @media (max-width: 640px) { #pt-root .pt-newbar { padding-right: 44px; } #pt-root .pt-newbar-x { position: absolute; top: 8px; right: 8px; } }
+
+/* loading skeleton */
+#pt-root .pt-sk { background: linear-gradient(90deg, var(--pt-line) 0%, var(--pt-bg, #f6f7f9) 50%, var(--pt-line) 100%); background-size: 200% 100%; animation: pt-sk 1.2s ease-in-out infinite; border-radius: 6px; height: 12px; margin: 8px 0; }
+#pt-root .pt-sk-title { height: 28px; width: 38%; margin: 8px 0 12px; }
+#pt-root .pt-sk-h { height: 20px; margin: 12px 0; }
+#pt-root .pt-sk-card { background: var(--pt-surface, #fff); border: 1px solid var(--pt-line); border-radius: var(--pt-radius); padding: 20px; margin-bottom: 12px; }
+@keyframes pt-sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { #pt-root .pt-sk { animation: none; } }
+#pt-root > .pt-wrap:not(.pt-sk-wrap) { animation: pt-fade .25s ease-out; }
+@keyframes pt-fade { from { opacity: 0; } to { opacity: 1; } }
