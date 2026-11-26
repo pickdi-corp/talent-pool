@@ -6,7 +6,7 @@
   var root = document.getElementById('pt-root');
   if (!root) return;
 
-  var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), sort: 'score', open: null,
+  var state = { all: [], q: '', field: new Set(), tier: new Set(), now: false, channel: new Set(), lang: new Set(), sort: 'score', open: null,
                 ids: null, pick: false, picked: new Set(), isNew: false, keep: [] };   // isNew: cold-mail visitor (?from=new), keep: from/utm params kept in the URL
   var CONSULT_URL = 'https://www.pickdi.co.kr/consult';
   function consultUrl(place, id) {
@@ -65,6 +65,7 @@
       if (state.field.size && !list(p.field_tags).some(function (f) { return state.field.has(f); })) return false;
       if (state.tier.size && !state.tier.has(p.tier)) return false;
       if (state.channel.size && !list(p.channels).some(function (c) { return state.channel.has(c); })) return false;
+      if (state.lang.size && !list(p.work_languages).some(function (c) { return state.lang.has(c); })) return false;
       if (state.now && !isNow(p)) return false;
       if (q) {
         var hay = [p.job_title, p.field_tags, p.career_summary, p.client_history, p.self_intro, p.past_tasks, p.key_achievements, p.tools, p.channels, p.client_industries, p.name_en].join(' ').toLowerCase();
@@ -100,11 +101,12 @@
   function render() {
     var res = filtered();
     var nowCount = state.all.filter(isNow).length;
-    var anyFilter = state.q || state.field.size || state.tier.size || state.channel.size || state.now;
+    var anyFilter = state.q || state.field.size || state.tier.size || state.channel.size || state.lang.size || state.now;
     var filtersHtml =
       '<input class="pt-search" id="pt-q" type="search" placeholder="직무, 툴, 채널로 검색" value="' + esc(state.q) + '" aria-label="검색">' +
       chipGroup('분야', 'field', counts('field_tags', list), state.field) +
       chipGroup('등급', 'tier', counts('tier', function (v) { return v ? [v] : []; }).sort(function (a, b) { return (TIER_ORDER[a[0]] || 9) - (TIER_ORDER[b[0]] || 9); }), state.tier) +
+      chipGroup('업무 가능 언어', 'lang', counts('work_languages', list).filter(function (x) { return x[0] !== '베트남어'; }), state.lang) +
       '<div class="pt-fgroup"><h3>업무 시작</h3><div class="pt-chips"><button type="button" class="pt-chip" data-k="now" aria-pressed="' + state.now + '">즉시 가능<span class="pt-n">' + nowCount + '</span></button></div></div>' +
       chipGroup('채널 경험', 'channel', counts('channels', list), state.channel) +
       (anyFilter ? '<button type="button" class="pt-reset" data-k="reset">필터 초기화</button>' : '');
@@ -147,7 +149,7 @@
     var q = [];
     if (state.ids) q.push('ids=' + state.ids.join(','));
     if (state.pick) q.push('pick=1');
-    [['field', state.field], ['tier', state.tier], ['channel', state.channel]].forEach(function (x) {
+    [['field', state.field], ['tier', state.tier], ['lang', state.lang], ['channel', state.channel]].forEach(function (x) {
       if (x[1].size) q.push(x[0] + '=' + encodeURIComponent(Array.from(x[1]).join(SEP)));
     });
     if (state.now) q.push('now=1');
@@ -163,7 +165,7 @@
     if (p.ids) state.ids = p.ids.toUpperCase().split(/[,\s]+/).filter(function (x) { return /^MEM_/.test(x); });
     if (state.ids && !state.ids.length) state.ids = null;
     state.pick = p.pick === '1';
-    ['field', 'tier', 'channel'].forEach(function (k) { if (p[k]) p[k].split(SEP).forEach(function (v) { if (v) state[k].add(v); }); });
+    ['field', 'tier', 'lang', 'channel'].forEach(function (k) { if (p[k]) p[k].split(SEP).forEach(function (v) { if (v) state[k].add(v); }); });
     state.now = p.now === '1';
     if (p.q) state.q = p.q;
     if (/^(score|recent|avail|exp|pickdi|tier)$/.test(p.sort || '')) state.sort = p.sort;
@@ -212,10 +214,10 @@
     }
   }
   function opt(v, label) { return '<option value="' + v + '"' + (state.sort === v ? ' selected' : '') + '>' + label + '</option>'; }
-  function activeCount() { return state.field.size + state.tier.size + state.channel.size + (state.now ? 1 : 0); }
+  function activeCount() { return state.field.size + state.tier.size + state.channel.size + state.lang.size + (state.now ? 1 : 0); }
   function mobileWrap(html) {
     return window.matchMedia('(max-width: 860px)').matches
-      ? '<details' + (state.mobileOpen ? ' open' : '') + ' id="pt-fdetails"><summary><span class="pt-sum-l"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>필터' + (activeCount() ? ' <b class="pt-sum-n">' + activeCount() + '</b>' : '') + '</span><span class="pt-sum-r"><span class="pt-sum-closed">분야·등급·채널 선택</span><span class="pt-sum-open">접기</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></summary><div style="display:flex;flex-direction:column;gap:18px;margin-top:14px">' + html + '</div></details>'
+      ? '<details' + (state.mobileOpen ? ' open' : '') + ' id="pt-fdetails"><summary><span class="pt-sum-l"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>필터' + (activeCount() ? ' <b class="pt-sum-n">' + activeCount() + '</b>' : '') + '</span><span class="pt-sum-r"><span class="pt-sum-closed">분야·등급·언어 선택</span><span class="pt-sum-open">접기</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></summary><div style="display:flex;flex-direction:column;gap:18px;margin-top:14px">' + html + '</div></details>'
       : html;
   }
 
@@ -385,7 +387,7 @@
     var k = t.dataset.k, v = t.dataset.v;
     var d = root.querySelector('#pt-fdetails'); state.mobileOpen = d ? d.open : false;
     track('filter_use', { filter_type: k, filter_value: v || '' });
-    if (k === 'reset') { state.q = ''; state.field.clear(); state.tier.clear(); state.channel.clear(); state.now = false; }
+    if (k === 'reset') { state.q = ''; state.field.clear(); state.tier.clear(); state.channel.clear(); state.lang.clear(); state.now = false; }
     else if (k === 'now') state.now = !state.now;
     else { var set = state[k]; set.has(v) ? set.delete(v) : set.add(v); }
     render();
